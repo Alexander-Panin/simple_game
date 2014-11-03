@@ -1,0 +1,27 @@
+sheet image_resize
+{
+  input:
+    initial_width : 5 ∗ 300;
+    initial_height : 7 ∗ 300;
+  interface:
+    preserve_ratio : true;
+    absolute_width : initial_width;
+    absolute_height : initial_height;
+    relative_width;
+    relative_height;
+  logic:
+    relate {
+      absolute_width <== relative_width ∗ initial_width / 100;
+      relative_width <== absolute_width ∗ 100 / initial_width;
+    }
+    relate {
+      absolute_height <== relative_height ∗ initial_height / 100;
+      relative_height <== absolute_height ∗ 100 / initial_height;
+    }
+    when (preserve_ratio) relate {
+      relative_width <== relative_height;
+      relative_height <== relative_width;
+    }
+  output:
+    result <== { height: absolute_height, width: absolute_width };
+}
