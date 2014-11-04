@@ -1,3 +1,20 @@
+obj = 'sheet', name, '{', data, '}';
+data = { key, ':', map, data };
+key = 'input' | 'interface' | 'logic' | 'output';
+map = mlogic | moutput | minput | minterface;
+minput = name, ':', expr, ';', { minput };
+minterface = name, ':', { expr }, ';', { minterface } ;
+moutput = name, '<==', kv, { moutput } ;
+mlogic = ['when', '(', bexpr, ')'] 'relate' '{', constraint ,'}' 
+constraint = name, '<==', expr, ';', { constraint };   
+expr = bexpr | nexpr; 
+bexpr = bool, bop, { bexpr };
+bop = '||', '&&';
+bool = 'true' | 'false' | var ;
+nexpr = number | number op expr;
+op = '+' | '_' | '*' | '\' | '%';
+number = \d | var;
+
 sheet image_resize
 {
   input:
