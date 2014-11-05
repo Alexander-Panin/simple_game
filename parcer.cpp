@@ -22,17 +22,24 @@ bool is_sheet(code_point_t& c) {
   //obj ::= 'sheet', name, '{', data, '}';
   for (const char& x: "sheet") if !(is_match(x, c)) return false;
   std::string sheet_name; // token, after move in the table
-  if (is_name(sheet_name, c) && is_match('{', c) && is_data(c) && is_match('}',c)) return true;
+  if (is_name(sheet_name, c) && is_match('{', c) 
+      && is_data(c) && is_match('}',c)) return true;
   else return false;
 }
 
 bool is_data(code_point_t& c) {
   //data ::= { key, ':', map, data };
-  std::string key;
-  if (is_key(key, c)) {
-    if !(is_match(':', c)) && is_map(key, c) return false;
-    return is_data(c);
+  if (is_key(c)) {
+    return is_match(':', c) && is_map(c) && is_data(c);
   } else return true;
+}
+
+bool is_key(code_point_t& c, const char* key = "input") {
+  //key ::= 'input' | 'interface' | 'logic' | 'output';
+  if !(is_name(c)) return false;
+  const char* key = register_lookup_name(); // 
+  return strcmp("input", key) || strcmp("interface", key) 
+         || strcmp("logic", key) || strcmp("output", key);
 }
 
 bool is_map(code_point_t& c) {
@@ -42,11 +49,27 @@ bool is_map(code_point_t& c) {
 
 bool is_minput(code_point_t& c, bool optional = false) {
   //minput ::= name, ':', expr, ';', { minput };
-  if (is_name(c)) {
-    if !(is_match(':', c) && is_expr(c) && is_match(';', c)) return false;
-    return is_minput(c, true);
-  } else return false || optional;
+  if !(is_name(c)) return optional; 
+  if !(is_match(':', c) && is_expr(c) && is_match(';', c)) return false; 
+  store("input", register_lookup_name(), register_lookup_expr());
+  return is_minput(c, true);
 }
+
+bool is_minterface(code_point_t& c, bool optional = false) {
+  //minterface ::= name, ':', { expr }, ';', { minterface } ;
+  if !(is_name(c)) return optional;
+  if !(is_match(':', c)) return false;
+  is_expr(c); if !(is_match(';', c)) return false;
+  store("interface", register_lookup_name(), register_lookup_expr());
+  return is_minterface(c, true);
+}
+
+bool is_mlogic(code_point_t& c) {
+  //mlogic ::= ['when', '(', bexpr, ')'] 'relate' '{', constraint ,'}'
+
+
+}
+
 
 
 template <typename I>
