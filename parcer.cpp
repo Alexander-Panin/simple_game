@@ -1,20 +1,79 @@
-//obj ::= 'sheet', name, '{', data, '}';
-//data ::= { key, ':', map, data };
-//key ::= 'input' | 'interface' | 'logic' | 'output';
-//map ::= mlogic | moutput | minput | minterface;
-//minput ::= name, ':', expr, ';', { minput };
-//minterface ::= name, ':', { expr }, ';', { minterface } ;
-//moutput ::= name, '<==', kv, { moutput } ;
-//mlogic ::= ['when', '(', bexpr, ')'] 'relate' '{', constraint ,'}'
-//constraint ::= name, '<==', expr, ';', { constraint };
-//expr ::= bexpr | nexpr;
-//nexpr ::= number | number, op, expr;
-//bexpr ::= bool | bool, bop, bexpr;
-//bop ::= '||' | '&&';
-//op ::= '+' | '_' | '*' | '\' | '%';
-//number ::= \d | var;
-//bool ::= 'true' | 'false' | var ;
-//name ::= letter, { letter | '_' }
+expr ::= bexpr | nexpr
+bexpr ::= 'true' | 'false' | var
+nexpr ::= number | rnumber | (number | rnumber) op expr | var
+rnumber = number, '.', number 
+number ::= d, {d}
+kv ::= name, ':', expr, ',', , {kv}
+name ::= letter, {(letter | '_')} 
+when ::= ''
+
+void foo(c) {
+  while(c != EOF) {
+    name = is_name(c);
+    if (is_match(':', c)) is_val(c) && is_match(';') continue;
+    if ((is_match('<') && is_match('=') && is_match('=')) is_expr(c) || is_hsh(c);
+    if (is_match('(', c)) is_when(c); 
+    if (is_match('{', c)) is_blck(c);
+  }
+}
+
+sheet image_resize
+{
+  input:
+    initial_width : 5 ∗ 300;
+    initial_height : 7 ∗ 300;
+  interface:
+    preserve_ratio : true;
+    absolute_width : initial_width;
+    absolute_height : initial_height;
+    relative_width;
+    relative_height;
+  logic:
+    relate {
+      absolute_width <== relative_width ∗ initial_width / 100;
+      relative_width <== absolute_width ∗ 100 / initial_width;
+    }
+    relate {
+      absolute_height <== relative_height ∗ initial_height / 100;
+      relative_height <== absolute_height ∗ 100 / initial_height;
+    }
+    when (preserve_ratio) relate {
+      relative_width <== relative_height;
+      relative_height <== relative_width;
+    }
+  output:
+    result <== { height: absolute_height, width: absolute_width };
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 using code_point_t = char;
 
