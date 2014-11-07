@@ -1,24 +1,42 @@
-expr ::= bexpr | nexpr
-bexpr ::= 'true' | 'false' | var
-nexpr ::= number | rnumber | (number | rnumber) op expr | var
-rnumber = number, '.', number 
-number ::= d, {d}
-kv ::= name, ':', expr, ',', , {kv}
-name ::= letter, {(letter | '_')} 
-when ::= ''
+row = key, conn, { row }
+key = letter, { letter | '_' }
+letter = 'a'..'z'
+conn = ':' | ';' | ',' | arrow | op
+arrow = '<', { '=' } 
+op = '+' | '-' | '*' | '/'
 
-void foo(c) {
-  while(c != EOF) {
-    name = is_name(c);
-    if (is_match(':', c)) is_val(c) && is_match(';') continue;
-    if ((is_match('<') && is_match('=') && is_match('=')) is_expr(c) || is_hsh(c);
-    if (is_match('(', c)) is_when(c); 
-    if (is_match('{', c)) is_blck(c);
-  }
+bool is_row(code_point_t& c) {
+  while (c != EOF) if !(is_key(c) && is_conn(c)) return false;
+  return true;
 }
 
-sheet image_resize
-{
+bool is_key(code_point_t& c) {
+  if !(is_match(is_letter, c) return false;
+  while (is_match(is_letter, c) || is_match('_', c)) ;
+  return true;
+}
+
+bool is_letter(code_point_t& c) { return c > 95 && c < 123; }  // a..z
+
+bool is_conn(code_point_t& c) {
+  return (is_match(':') || is_match(';') || is_match(',')
+          || is_match(is_op,c) || is_arrow(c)); 
+}
+
+bool is_op(code_point_t& t) {
+  return is_match('+', c) || is_match('*', c) || is_match('-', c) || is_match('/',c);
+}
+
+bool is_arrow(code_point_t& c) {
+  if !(is_match('<', c)) return false;
+  while (is_match('=', c))
+}
+
+bool is_match((bool)(code_point_t&)*, code_point_t& ) {}
+bool is_match(code_point_t& x, code_point_t& c) {
+  if (c != EOF )
+}
+
   input:
     initial_width : 5 ∗ 300;
     initial_height : 7 ∗ 300;
@@ -29,51 +47,17 @@ sheet image_resize
     relative_width;
     relative_height;
   logic:
-    relate {
+    relate:
       absolute_width <== relative_width ∗ initial_width / 100;
       relative_width <== absolute_width ∗ 100 / initial_width;
-    }
-    relate {
+    relate:
       absolute_height <== relative_height ∗ initial_height / 100;
       relative_height <== absolute_height ∗ 100 / initial_height;
-    }
-    when (preserve_ratio) relate {
+    when (preserve_ratio) relate:
       relative_width <== relative_height;
       relative_height <== relative_width;
-    }
   output:
-    result <== { height: absolute_height, width: absolute_width };
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    result <== height: absolute_height, width: absolute_width;
 
 using code_point_t = char;
 
