@@ -1,49 +1,106 @@
-//row = key, conn, { row }
-//key = letter, { letter | '_' }
-//letter = 'a'..'z'
-//conn = ':' | ';' | ',' | '(' | ')' | arrow | op
-//arrow = '<', { '=' } 
-//op = '+' | '-' | '*' | '/'
+#include <iostream>
+#include <iterator>
 
-bool is_row(code_point_t& c) {
-  while (f != l) if !(is_key(c) && is_conn(c)) return false;
-  return true;
-}
+// row ::= key, conn, { row }
+// key ::= name | rnumber
+// name ::= letter, { letter | '_' }
+// rnumber ::= number | number, '.', number
+// number ::= digit, { digit }
+// letter ::= 'a'..'z'
+// digit ::= '0'..'9'
+// conn ::= ':' | ';' | ',' | '(' | ')' | arrow | op
+// arrow ::= '<', { '=' } 
+// op ::= '+' | '-' | '*' | '/'
 
-bool is_key(code_point_t& c) {
-  if !(is_match(is_letter, c) return false;
-  while (is_match(is_letter, c) || is_match('_', c)) ;
-  return true;
-}
+using code_point_t = char;
 
 bool is_letter(code_point_t x) { return x > 95 && x < 123; }  // a..z
+bool is_op(code_point_t x) { return x == '+' || x == '-' || x == '*' || x == '/'; }
+bool is_digit(code_point_t x) { return x > 47 && x < 58; } // 0..9
 
-bool is_conn(code_point_t& c) {
-  return (is_match(':') || is_match(';') || is_match(',') || is_match('(')
-          || is_match(')') || is_match(is_op,c) || is_arrow(c)); 
+template <typename I>
+// require value_type(I) = code_point_t
+//   && InputIterator(I)
+struct parser 
+{
+  I f;
+  I l;
+
+  bool is_row(std::ostream& cout) {
+    code_point_t c;
+    while (f != l) { 
+      std::string key, conn;
+      if (is_key(c, key) && is_conn(c, conn)) ; else return false; 
+      cout << key << ' ' << conn << std::endl; 
+    }
+    return true;
+  }
+
+  bool is_key(code_point_t& c, std::string& result) {
+    return is_name(c, result) || is_rnumber(c, result);
+  }  
+
+  bool is_name(code_point_t& c, std::string& result) {
+    if (is_match(is_letter, c)) ; else return false;
+    result += c;
+    while (is_match(is_letter, c) || is_match('_', c)) result += c;
+    return true;
+  }
+
+  bool is_rnumber(code_point_t& c, std::string& result) {
+    if (is_number(c, result)) ; else return false;
+    if (is_match('.', c)) {
+      result += c;
+      if (is_number(c, result)) ; else return false;
+    }
+    return true;
+  }
+
+  bool is_number(code_point_t& c, std::string& result) {
+    if (is_match(is_digit, c)) ; else return false;
+    result += c;
+    while (is_match(is_digit, c)) result += c; 
+    return true;
+  }
+
+  bool is_conn(code_point_t& c, std::string& result) {
+    if (is_match(':', c) || is_match(';', c) || is_match(',', c) || is_match('(', c)
+        || is_match(')', c) || is_match(is_op, c)) { result += c; return true; }
+    return is_arrow(c, result); 
+  }
+
+  bool is_arrow(code_point_t& c, std::string& result) {
+    if (is_match('<', c)) ; else return false;
+    result += c;
+    while (is_match('=', c)) result += c;
+    return true;
+  }
+
+  bool is_match(bool (*p)(code_point_t), code_point_t& c) {
+    while(f != l && (*f == ' ' || *f == '\t' || *f == '\n')) ++f;
+    if (f == l || !p(*f)) return false;
+    c = *f; f++; return true; 
+  }
+
+  bool is_match(code_point_t x, code_point_t& c) {
+    while(f != l && (*f == ' ' || *f == '\t' || *f == '\n')) ++f;
+    if (f == l || *f != x) return false;
+    c = x; f++; return true; 
+  }
+};
+
+int main() {
+  using it = std::istream_iterator<code_point_t>;
+  it eos; it f(std::cin);
+  parser<it> p { f, eos };
+  p.is_row(std::cout);
+  
+  return 0;
 }
 
-bool is_op(code_point_t& t) {
-  return is_match('+', c) || is_match('*', c) || is_match('-', c) || is_match('/',c);
-}
 
-bool is_arrow(code_point_t& c) {
-  if !(is_match('<', c)) return false;
-  while (is_match('=', c)) {}
-}
-
-bool is_match(bool (*p)(code_point_t), code_point_t& c) {
-  while(f =! l && (*f == ' ' || *f == '\t' || *f == '\n') ++f;
-  if (f == l || p(*f) != x) return false;
-  c = x; f++; return true; 
-}
-
-bool is_match(code_point_t& x, code_point_t& c) {
-  while(f =! l && (*f == ' ' || *f == '\t' || *f == '\n') ++f;
-  if (f == l || *f != x) return false;
-  c = x; f++; return true; 
-}
-
+// *** example ***
+//
 //  input:
 //    initial_width : 5 ∗ 300;
 //    initial_height : 7 ∗ 300;
