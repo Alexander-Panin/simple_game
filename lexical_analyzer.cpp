@@ -1,5 +1,6 @@
 #include <iostream>
 #include <iterator>
+#include <cassert>
 
 // row ::= key, conn, { row }
 // key ::= name | rnumber
@@ -9,36 +10,36 @@
 // letter ::= 'a'..'z'
 // digit ::= '0'..'9'
 // conn ::= ':' | ';' | ',' | '(' | ')' | arrow | op
-// arrow ::= '<', { '=' } 
+// arrow ::= '<', { '=' }
 // op ::= '+' | '-' | '*' | '/'
 
 using code_point_t = char;
 
-bool is_letter(code_point_t x) { return x > 95 && x < 123; }  // a..z
+bool is_letter(code_point_t x) { return x > 96 && x < 123; }  // a..z
 bool is_op(code_point_t x) { return x == '+' || x == '-' || x == '*' || x == '/'; }
 bool is_digit(code_point_t x) { return x > 47 && x < 58; } // 0..9
 
 template <typename I>
 // require value_type(I) = code_point_t
 //   && InputIterator(I)
-struct parser 
+struct lexical_analyzer
 {
   I f;
   I l;
 
   bool is_row(std::ostream& cout) {
     code_point_t c;
-    while (f != l) { 
+    while (f != l) {
       std::string key, conn;
-      if (is_key(c, key) && is_conn(c, conn)) ; else return false; 
-      cout << key << ' ' << conn << std::endl; 
+      if (is_key(c, key) && is_conn(c, conn)) ; else return false;
+      cout << key << ' ' << conn << std::endl;
     }
     return true;
   }
 
   bool is_key(code_point_t& c, std::string& result) {
     return is_name(c, result) || is_rnumber(c, result);
-  }  
+  }
 
   bool is_name(code_point_t& c, std::string& result) {
     if (is_match(is_letter, c)) ; else return false;
@@ -59,14 +60,14 @@ struct parser
   bool is_number(code_point_t& c, std::string& result) {
     if (is_match(is_digit, c)) ; else return false;
     result += c;
-    while (is_match(is_digit, c)) result += c; 
+    while (is_match(is_digit, c)) result += c;
     return true;
   }
 
   bool is_conn(code_point_t& c, std::string& result) {
     if (is_match(':', c) || is_match(';', c) || is_match(',', c) || is_match('(', c)
         || is_match(')', c) || is_match(is_op, c)) { result += c; return true; }
-    return is_arrow(c, result); 
+    return is_arrow(c, result);
   }
 
   bool is_arrow(code_point_t& c, std::string& result) {
@@ -79,22 +80,22 @@ struct parser
   bool is_match(bool (*p)(code_point_t), code_point_t& c) {
     while(f != l && (*f == ' ' || *f == '\t' || *f == '\n')) ++f;
     if (f == l || !p(*f)) return false;
-    c = *f; f++; return true; 
+    c = *f; f++; return true;
   }
 
   bool is_match(code_point_t x, code_point_t& c) {
     while(f != l && (*f == ' ' || *f == '\t' || *f == '\n')) ++f;
     if (f == l || *f != x) return false;
-    c = x; f++; return true; 
+    c = x; f++; return true;
   }
 };
 
 int main() {
   using it = std::istream_iterator<code_point_t>;
   it eos; it f(std::cin);
-  parser<it> p { f, eos };
-  p.is_row(std::cout);
-  
+  lexical_analyzer<it> la { f, eos };
+  assert(la.is_row(std::cout));
+
   return 0;
 }
 

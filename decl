@@ -1,5 +1,5 @@
 input:
-  initial_width : 5.5 * 300;
+  initial_width : 5 * 300;
   initial_height : 7 * 300;
 interface:
   preserve_ratio : true;
@@ -19,3 +19,4 @@ logic:
     relative_height <== relative_width;
 output:
   result <== height: absolute_height, width: absolute_width;
+  result2 <== height: absolute_height, width: absolute_width;
