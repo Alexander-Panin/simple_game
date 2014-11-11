@@ -43,8 +43,7 @@ struct lexical_analyzer
 
   bool is_name(code_point_t& c, std::string& result) {
     if (is_match(is_letter, c)) ; else return false;
-    result += c;
-    while (is_match(is_letter, c) || is_match('_', c)) result += c;
+    result += c; while (is_match(is_letter, c) || is_match('_', c)) result += c;
     return true;
   }
 
@@ -59,8 +58,7 @@ struct lexical_analyzer
 
   bool is_number(code_point_t& c, std::string& result) {
     if (is_match(is_digit, c)) ; else return false;
-    result += c;
-    while (is_match(is_digit, c)) result += c;
+    result += c; while (is_match(is_digit, c)) result += c;
     return true;
   }
 
@@ -72,8 +70,7 @@ struct lexical_analyzer
 
   bool is_arrow(code_point_t& c, std::string& result) {
     if (is_match('<', c)) ; else return false;
-    result += c;
-    while (is_match('=', c)) result += c;
+    result += c; while (is_match('=', c)) result += c;
     return true;
   }
 
