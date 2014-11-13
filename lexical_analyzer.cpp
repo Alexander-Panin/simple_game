@@ -92,10 +92,8 @@ int main() {
   it eos; it f(std::cin);
   lexical_analyzer<it> la { f, eos };
   assert(la.is_row(std::cout));
-
   return 0;
 }
-
 
 // *** example ***
 //
