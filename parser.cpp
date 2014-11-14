@@ -7,11 +7,15 @@ using token_t = std::string;
 std::map<std::string, bool> btab;
 std::map<std::string, double> dtab;
 
-// key : -> (level + key) set key
-// key op -> key lookup | double | bool // reduce to tree
+// key : -> set (level + key)
+// key op -> key lookup | double | bool
 // key ; -> key lookup | set key default value also terminated
 // key <== val -> pair<key, lazy val>
 // key , -> just continue
+//
+// ???
+// key ( -> key should eq when
+// key ) -> just continue
 
 // lookup (dtab, btab) functor
 // vector<key> depends on level
