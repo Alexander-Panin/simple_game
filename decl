@@ -19,4 +19,3 @@ logic:
     relative_height <== relative_width;
 output:
   result <== height: absolute_height, width: absolute_width;
-  result_ <== height: absolute_height, width: absolute_width;
