@@ -32,16 +32,14 @@ struct lexical_analyzer
     code_point_t c;
     while (f != l) {
       token_t key, conn;
-      if (is_key(c, key) && is_conn(c, conn)) ; else return false;
-      cout << level << ' ' << key << ' ' << conn << std::endl;
-      // if (*f == 'n')
+      if (is_key(c, key) && skip_ws() && is_conn(c, conn)) ; else return false;
+      cout << level << ' ' << key << ' ' << conn << std::endl; skip_ws();
     }
     return true;
   }
 
-  bool is_key(code_point_t& c, token_t& result) {
-    return is_name(c, result) || is_rnumber(c, result);
-  }
+  bool is_key(code_point_t& c, token_t& result)
+  { return is_name(c, result) || is_rnumber(c, result); }
 
   bool is_name(code_point_t& c, token_t& result) {
     if (is_match(is_letter, c)) ; else return false;
@@ -77,23 +75,23 @@ struct lexical_analyzer
   }
 
   bool is_match(bool (*p)(code_point_t), code_point_t& c) {
-    skip_whitespaces();
     if (f == l || !p(*f)) return false;
     c = *f; f++; return true;
   }
 
   bool is_match(code_point_t x, code_point_t& c) {
-    skip_whitespaces();
     if (f == l || *f != x) return false;
     c = x; f++; return true;
   }
 
-  void skip_whitespaces() {
+  bool skip_ws() {
     skip_step("\t ");
-    if (f !=l && *f == '\n') { skip_step("\n"); level = skip_step("\t \n"); }
+    if (f !=l && *f == '\n')
+    { skip_step("\n"); level = skip_step("\t \n"); }
+    return true;
   }
 
-  int skip_step(std::string pat, std::size_t c = 0) {
+  std::size_t skip_step(std::string pat, std::size_t c = 0) {
     while(f != l && find(begin(pat), end(pat), *f) != end(pat)) { ++f; ++c; }
     return c;
   }

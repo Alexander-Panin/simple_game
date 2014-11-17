@@ -4,8 +4,6 @@
 #include <map>
 
 using token_t = std::string;
-std::map<std::string, bool> btab;
-std::map<std::string, double> dtab;
 
 // key : -> set (level + key)
 // key op -> key lookup | double | bool
@@ -13,15 +11,26 @@ std::map<std::string, double> dtab;
 // key <== val -> pair<key, lazy val>
 // key , -> just continue
 //
-// ???
-// key ( -> key should eq when
-// key ) -> just continue
+// key ( -> key = "when"
+// key ) -> set predicate
 
-// lookup (dtab, btab) functor
-// vector<key> depends on level
-// vector<constraints>, constrains = vector<relate>, relate = pair<key, lazy val>
-// in quick-alg compare relate consistents
-// when output apply lazy val and return val
+struct bt
+{
+  std::vector<node> pool;
+  using node_t = std::size_t;
+  struct node {
+    token_t key_;
+    token_t conn_;
+    std::vector<node_t> nodes;
+  };
+
+  node& node_(node_t idx) { return pool[idx]; }
+
+  node_t push(node_t node, token_t key, token_t conn) {
+    node_(node) =
+  }
+
+};
 
 bool is_bool(...);
 bool is_number(...);
@@ -55,7 +64,7 @@ struct num_tree
 };
 
 int main() {
-  using it = std::istream_iterator<std::string>;
+  using it = std::istream_iterator<token_t>;
   it l; it f(std::cin);
   while (f != l) { }
 
