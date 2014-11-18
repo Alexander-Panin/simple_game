@@ -3,12 +3,11 @@
 #include <algorithm>
 #include <map>
 #include <functional>
+#include <stdlib.h>
 
 using token_t = std::string;
 using value_t = double;
 
-// key : -> set (level + key)
-// key op -> key lookup | double | bool
 // key ; -> key lookup | set key default value also terminated
 // key <== val -> pair<key, lazy val>
 // key , -> just continue
@@ -16,56 +15,81 @@ using value_t = double;
 // key ( -> key = "when"
 // key ) -> set predicate
 
+std::vector<token_t> stack { "output", "logic", "interface", "input" };
+std::map<token_t, value_t> tab { {"true", 1}, {"false", 0} };
+value_t lookup(token_t key) { return tab[key]; }
+void record(token_t key, value_t val) { tab[key] = val; }
+bool is_number(token_t key) { return key[0] > 47 && key[0] < 58;  } // 0..9
 
-bool is_bool(...);
-bool is_number(...);
-
-std::vector<token_t> first_level_keys { "output", "logic", "interface", "input" };
-token_t key1, key2, key3;
-//std::vector<std::function<value_t()>> ops { std::plus, std::mult };
-std::vector<std::function<value_t()>> ops {
-  [](value_t a, value_t b) { return a+b; },
-  [](value_t a, value_t b) { return a*b; }
+void parse_section_logic(token_t& level, token_t& key, token_t& conn) {
+  token_t prev_level = level;
+  token_t tmp_key;
+  while (parse_step(level, key, conn) && level != prev_level) {
+    if (key == "relate" && conn == ":") push_back ...;
+    if (conn == "<==") tmp_key = key;
+    while (parse_step)
+  }
 }
+
+
 
 template <typename T>
 void parse_section(token_t& level, token_t& key, token_t& conn) {
   token_t prev_level = level;
-  token_t k_acc;
-  do {
-    if (parse_step(level, key, conn)); else return;
-    if (conn == ":") k_acc = key; continue;
-    if (conn == ";") { record(key, value_t()); continue; } // default value
-    record(k_acc, num_reducer(level, key, conn));
-  } while (level != prev_level);
+  token_t tmp_key;
+  while (parse_step(level, key, conn) && level != prev_level) {
+    if (conn == ":") tmp_key = key; continue;
+    if (conn == ";") { record(key, value_t()); continue; }
+    //assert(is_number(key) && is_var(key));
+    numeric num { key, conn, std::bind1st(parse_step, level) };
+    record(tmp_key, num.reduce());
+  }
   parse_header (level, key, conn);
-}
-
-value_t num_reducer(level, key, conn) {
-  value_t acc = (conn == ("*" || "/") ? 1 : 0);
-  token_t prev_op;
-  do {
-    acc = num_reduce_step(key, conn, prev_op, acc);
-    prev_op = conn;
-    parse_step(level, key, conn);
-  } while (conn != ";");
-
-  return num_reduce_step(key, prev_op, prev_op, acc);
-}
-
-value_t value_t num_reduce_step(const token_t& key, const token_t& conn,
-                                  const token_t& prev_op, const value_t& acc) {
-  value_t tmp = is_number(key) ? to_double(key) : lookup(key);
-  if (prev_op == "-") tmp *= -1;
-  if (prev_op == "/") tmp = 1/tmp;
-  auto op = (op == "+" || op == "-") ? ops[0] : ops[1];
-  return op(acc, tmp);
 }
 
 void parse_header(token_t& level, token_t& key, conn) {
   if ( key == stack.back() && conn == ":") stack.pop_back(); else return;
   parse_section<key>(level, key, conn);
 }
+
+value_t to_number(const token_t& key, token_t& conn) {
+  value_t key0 = is_number(key) ? atof(key.c_str()) : lookup(key);
+  if (conn == '-') { key0 *= -1; conn = "+" }
+  if (conn == '/') { key0 = 1/key0; conn = "*" }
+  return key0;
+}
+
+template <typename Op>
+// Op should provide new key and conn
+struct numeric
+{
+  // require conn != ';'
+  token_t key; token_t conn;
+  Op next;
+  value_t reduce() {
+    value_t key0 = to_number(key, conn);
+    numeric_step ns { key0, conn, value_t() };
+    do {
+      if (next(key, conn)) ; else assert(false);
+      key0 = to_number(key, conn);
+    } while (ns.reduce(key0, conn));
+    return ns.acc;
+  }
+}
+
+struct numeric_step
+{
+  // require conn = '+' or '*'
+  value_t key_; token_t conn_;
+  value_t acc_;
+  bool reduce()(value_t key, token_t conn)  {
+    if (conn_ == '+') acc_ += key_;
+    if (conn_ == '*') key *= key_;
+    if (conn == ';') { acc_ += key; return false; }
+    key_ = key; conn_ = conn; return true;
+  }
+}
+
 
 bool parse() {
   token_t level, key, conn;
