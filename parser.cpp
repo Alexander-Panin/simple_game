@@ -21,13 +21,25 @@ value_t lookup(token_t key) { return tab[key]; }
 void record(token_t key, value_t val) { tab[key] = val; }
 bool is_number(token_t key) { return key[0] > 47 && key[0] < 58;  } // 0..9
 
+struct when
+{
+  token_t key;
+  bool operator()() { return (key == token_t() ? true : lookup(key)); }
+}
+
 void parse_section_logic(token_t& level, token_t& key, token_t& conn) {
   token_t prev_level = level;
   token_t tmp_key;
   while (parse_step(level, key, conn) && level != prev_level) {
-    if (key == "relate" && conn == ":") push_back ...;
-    if (conn == "<==") tmp_key = key;
-    while (parse_step)
+    when w;
+    if (key == "relate" && conn == ":") { push_back ...; continue; }
+    if (key == "when" ... get next ) {  }
+    if (conn == "<==") {
+      tmp_key = key;
+      grasp_relate();
+
+    }
+
   }
 }
 
