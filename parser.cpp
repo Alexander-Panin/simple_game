@@ -9,9 +9,9 @@
 using token_t = std::string;
 using value_t = double;
 
+struct rule;
 using relate_t = std::vector<rule>;
 std::vector<relate_t> constraints;
-std::vector<token_t> stack { "output", "logic", "interface", "input" };
 std::map<token_t, value_t> tab { {"true", 1}, {"false", 0} };
 std::map<token_t, value_t> result;
 value_t lookup(token_t key) { return tab[key]; }
@@ -19,23 +19,56 @@ void record(token_t key, value_t val) { tab[key] = val; }
 void record_result(token_t key, value_t val) { result[key] = val; }
 bool is_number(token_t key) { return key[0] > 47 && key[0] < 58;  } // 0..9
 
-void parse_section_output(token_t& level, token_t& key, token_t& conn) {
-  token_t prev_level = level;
+value_t to_number(const token_t& key)
+{ return is_number(key) ? atof(key.c_str()) : lookup(key); }
+
+value_t to_number(const token_t& key, token_t& conn) {
+  value_t key0 = is_number(key) ? atof(key.c_str()) : lookup(key);
+  if (conn == '-') { key0 *= -1; conn = "+" }
+  if (conn == '/') { key0 = 1/key0; conn = "*" }
+  return key0;
+}
+
+template <typename T>
+struct parser_section_t {
+  parser_section_t(T x) : self_(new model_t<T>(std::move(x))) {}
+  friend parse_section(const parser_section_t& p,
+                        token_t& level, token_t& key, token_t& conn) {
+    p.self_->parse_section(level, key, conn);
+  }
+  struct concept_t {
+    virtual ~concept_t() = default;
+    virtual void parse_section(token_t& level, token_t& key, token_t& conn) = 0;
+  };
+
+  template <typename T>
+  struct model_t : concept_t {
+    model_t(T x) : data_(std::move(x)) {}
+    void parse_section(token_t& level, token_t& key, token_t& conn) {
+      parse_section(data_, level, key, conn);
+    }
+    T data_;
+  }
+  std::unique_ptr<concept_t<T>> self_;
+};
+
+struct section_output { };
+void parse_section(const section_output&, token_t& level,token_t& key,token_t& conn) {
+  token_t prev_level = level; token_t tmp_key;
   while (parse_step(level, key, conn) && level != prev_level) {
-    if (conn == "<==") continue;
-    else if (conn == ":") tmp_key = key;
-    else if (conn == "," || conn == ';') record_result(tmp_key, to_number(key))
+    if (conn == ":") tmp_key = key;
+    if (conn == "," || conn == ';') record_result(tmp_key, to_number(key))
   }
 }
 
-void parse_section_logic(token_t& level, token_t& key, token_t& conn) {
-  token_t prev_level = level;
-  token_t when;
+struct section_logic { };
+void parse_section(const section_logic&, token_t& level,token_t& key,token_t& conn) {
+  token_t prev_level = level; token_t when;
   while (parse_step(level, key, conn) && level != prev_level) {
     bool is_when = false;
-    if (key == "relate") { constraints.push_back(relate_t()); }
+    if (key == "relate") constraints.push_back(relate_t());
     else if (key == "when") {
-      if (parse_step(level, key, conn)) ; else assert(false);
+      parse_step(level, key, conn);
       when = key; is_when=true;
     }
     else if (conn == "<==") {
@@ -44,7 +77,8 @@ void parse_section_logic(token_t& level, token_t& key, token_t& conn) {
   }
 }
 
-template <typename Op>
+struct buff_stream; struct numeric_reducer;
+
 struct rule {
   token_t key_;
   token_t when;
@@ -75,32 +109,35 @@ struct buff_stream {
   }
 }
 
-
+struct section_input { };
+struct section_interface { };
 template <typename T>
-void parse_section(token_t& level, token_t& key, token_t& conn) {
-  token_t prev_level = level;
-  token_t tmp_key;
+void parse_section(const T& x, token_t& level, token_t& key, token_t& conn) {
+  token_t prev_level = level; token_t tmp_key;
   while (parse_step(level, key, conn) && level != prev_level) {
     if (conn == ":") tmp_key = key; continue;
     if (conn == ";") { record(key, value_t()); continue; }
-    //assert(is_number(key) && is_var(key));
     numeric_reducer nr { std::bind1st(parse_step, level) };
     record(tmp_key, nr(key, conn));
   }
-  parse_header (level, key, conn);
 }
 
-void parse_header(token_t& level, token_t& key, conn) {
-  if ( key == stack.back() && conn == ":") stack.pop_back(); else return;
-  parse_section<key>(level, key, conn);
+bool parse() {
+  token_t level, key, conn;
+  std::vector<token_t> keys { "output", "logic", "interface", "input" };
+  std::vector<parser_section_t> funct {
+    parser_section_t { section_output() },
+    parser_section_t { section_logic() },
+    parser_section_t { section_interface() },
+    parser_section_t { section_input() }
+  };
+  while (parse_step(level, key, conn)) {
+    if (key == keys.back()) keys.pop_back(); else return false;
+    funct.back().parse_section(level, key, conn); funct.pop_back();
+  }
+  return true;
 }
 
-value_t to_number(const token_t& key, token_t& conn) {
-  value_t key0 = is_number(key) ? atof(key.c_str()) : lookup(key);
-  if (conn == '-') { key0 *= -1; conn = "+" }
-  if (conn == '/') { key0 = 1/key0; conn = "*" }
-  return key0;
-}
 
 template <typename Op>
 // Op should provide new key and conn
@@ -131,13 +168,6 @@ struct numeric_reduce_step
     if (conn == ';') { acc_ += key; return false; }
     key_ = key; conn_ = conn; return true;
   }
-}
-
-bool parse() {
-  token_t level, key, conn;
-  if (parse_step(level, key, conn)) ; else return false;
-  parse_header(level, key, conn);
-  return stack.empty();
 }
 
 template <typename I>
