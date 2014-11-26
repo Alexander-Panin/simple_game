@@ -40,13 +40,13 @@ struct parser_t
 // require value_type(I) == token_t
 // && InputIterator(I)
 {
-  I f; I l;
+  I f ; I l;
 
   bool operator()(token_t& level, token_t& key, token_t& conn) {
     return parse_step(level) && parse_step(key) && parse_step(conn);
   }
 
-  bool is_match(token_t& x) {
+  bool is_match(const token_t& x) {
     if (f != l && *f == x) return true;
     else return false;
   }
@@ -57,19 +57,23 @@ struct parser_t
   }
 };
 
+using it = std::istream_iterator<token_t>;
+using iparser_t = parser_t<it>;
+
 struct sheet_t {
-  std::map<token_t, value_t> tab { {"true", 1}, {"false", 0} };
-  std::map<token_t, value_t> result;
+  using table_t = std::map<token_t, value_t>;
+  table_t tab { {"true", 1}, {"false", 0} };
+  table_t result;
 
   value_t lookup(token_t k) { return tab[k]; }
   struct rule {
-    token_t key_;
-    token_t when_;
-    buff_stream<parser_t> bs;
+    token_t key_; token_t when_;
+    buff_stream<iparser_t> bs;
+    sheet_t* s;
     bool operator()() {
-      if (lookup(when_)) ; else return true;
-      numeric_reducer nr { &bs };
-      return to_number(key_) == nr();
+      if (s->lookup(when_)) ; else return true;
+      numeric_reducer<decltype(bs)> nr { &bs };
+      return s->to_number(key_) == nr();
     }
   };
   using relate_t = std::vector<rule>;
@@ -79,16 +83,17 @@ struct sheet_t {
   struct numeric_reducer
   {
     Op* next;
+    sheet_t* s;
 
     value_t operator()() {
       token_t level, key, conn;
       if ((*next)(level, key, conn)) ; else assert(false);
       assert(conn != ";");
-      value_t key0 = to_number(key, conn);
+      value_t key0 = s->to_number(key, conn);
       numeric_reduce_step ns { key0, conn, value_t() };
       while (ns(key0, conn)) {
         if ((*next)(level, key, conn)) ; else assert(false);
-        key0 = to_number(key, conn);
+        key0 = s->to_number(key, conn);
       }
       return ns.acc_;
     }
@@ -108,20 +113,18 @@ struct sheet_t {
   };
 
   void make_rules_set() { constraints.emplace_back(relate_t()); }
-  void add_rule(token_t key, token_t when, buff_stream bf) {
-    constraints.back().emplace_back(
-      rule { std::move(key), std::move(when), std::move(bf) }
-    );
+  void add_rule(token_t key, token_t when, buff_stream<iparser_t> bf) {
+    constraints.back().emplace_back( rule { key, when, bf });
   }
   void record(token_t key, value_t val)
-  { tab[std::move(key)] = val; }
+  { tab[key] = val; }
   void record(token_t key, token_t val)
-  { tab[std::move(key)] = to_number(val); }
+  { tab[key] = to_number(val); }
   void record_result(token_t key, token_t val)
-  { result[std::move(key)] = to_number(val); }
-  void record_expr(token_t key, parser_t& p) {
-    numeric_reducer nr { &p };
-    tab[std::move(key)] = nr();
+  { result[key] = to_number(val); }
+  void record_expr(token_t key, iparser_t& p) {
+    numeric_reducer<decltype(p)> nr { &p };
+    tab[key] = nr();
   }
   value_t to_number(const token_t& key)
   { return is_number(key) ? atof(key.c_str()) : tab[key]; }
@@ -134,22 +137,34 @@ struct sheet_t {
   }
 };
 
+struct sec_input { };
+struct sec_interface { };
+template <typename T, typename Op>
+void parse_section(const T& x, const token_t& l, iparser_t& p, sheet_t& s) {
+  token_t level, key, conn, tmp_key;
+  while (!p.is_match(l) && p(level, key, conn)) {
+    if (conn == ":") tmp_key = key; continue;
+    if (conn == ";") { s.record(key, value_t()); continue; }
+    s.record_expr(tmp_key, p); //nr(level, key, conn));
+  }
+}
+
 struct parser_section_t {
   template <typename T>
   parser_section_t(T x) : self_(new model_t<T>(std::move(x))) {}
   friend void parse_section(const parser_section_t& ps, const token_t& l,
-                              parser_t& p, sheet_t& s) {
-    ps.self_->parse_section(l,p,s);
+                              iparser_t& p, sheet_t& s) {
+    ps.self_->parse_section_(l,p,s);
   }
   struct concept_t {
     virtual ~concept_t() = default;
-    virtual void parse_section(const token_t& l, parser_t& p, sheet_t& s) = 0;
+    virtual void parse_section_(const token_t& l, iparser_t& p, sheet_t& s) = 0;
   };
 
   template <typename T>
   struct model_t : concept_t {
     model_t(T x) : data_(std::move(x)) {}
-    void parse_section(const token_t& l, parser_t& p, sheet_t& s) {
+    void parse_section_(const token_t& l, iparser_t& p, sheet_t& s) {
       parse_section(data_, l, p, s);
     }
     T data_;
@@ -158,7 +173,7 @@ struct parser_section_t {
 };
 
 struct sec_output { };
-void parse_section(const sec_output& x, const token_t& l, parser_t& p, sheet_t &s) {
+void parse_section(const sec_output& x, const token_t& l, iparser_t& p, sheet_t &s) {
   token_t level, key, conn, tmp_key;
   while (!p.is_match(l) && p(level, key, conn)) {
     if (conn == ":") tmp_key = key;
@@ -167,7 +182,7 @@ void parse_section(const sec_output& x, const token_t& l, parser_t& p, sheet_t &
 }
 
 struct sec_logic { };
-void parse_section(const sec_logic&, const token_t& l, parser_t& p, sheet_t& s) {
+void parse_section(const sec_logic&, const token_t& l, iparser_t& p, sheet_t& s) {
   token_t level, key, conn, when;
   while (!p.is_match(l) && p(level, key, conn)) {
     bool is_when = false;
@@ -178,30 +193,13 @@ void parse_section(const sec_logic&, const token_t& l, parser_t& p, sheet_t& s) 
     }
     else if (conn == "<==") {
       if (p(level, key, conn)) ; else assert(false); // require the same level
-      s.add_rule( key, is_when ? when : "true", buff_stream bs { &p });
+      s.add_rule( key, is_when ? when : "true", buff_stream<decltype(p)>{ &p });
     }
   }
 }
 
 
-struct sec_input { };
-struct sec_interface { };
-template <typename T, typename Op>
-void parse_section(const T& x, const token_t& l, parser_t& p, sheet_t& s) {
-  token_t level, key, conn, tmp_key;
-  while (!p.is_match(l) && p(level, key, conn)) {
-    if (conn == ":") tmp_key = key; continue;
-    if (conn == ";") { s.record(key, value_t()); continue; }
-    s.record_expr(tmp_key, p); //nr(level, key, conn));
-  }
-}
-
-
-
-template <typename I>
-// require value_type(I) == token_t
-// && InputIterator(I)
-bool parse(I first, I last, sheet_t& s) {
+bool parse(it first, it last, sheet_t& s) {
   std::vector<token_t> keys { "output", "logic", "interface", "input" };
   std::vector<const parser_section_t> funct {
     parser_section_t { sec_output() },
@@ -210,8 +208,8 @@ bool parse(I first, I last, sheet_t& s) {
     parser_section_t { sec_input() }
   };
   token_t level, key, conn, sec_level;
-  auto p = parser_t { first, last };
-  while (parser(level, key, conn)) {
+  iparser_t p { first, last };
+  while (p(level, key, conn)) {
     assert( keys.size() );
     assert( sec_level == level );
     sec_level = level;
@@ -222,7 +220,6 @@ bool parse(I first, I last, sheet_t& s) {
 }
 
 int main() {
-  using it = std::istream_iterator<token_t>;
   it l; it f(std::cin);
   sheet_t s;
   assert(parse(f,l,s));
