@@ -75,8 +75,10 @@ struct sheet_t {
     sheet_t* s;
     bool operator()() {
       if (s->lookup(when_)) ; else return true;
+      token_t level, key, conn;
+      bs(level, key, conn);
       numeric_reducer<decltype(bs)> nr { bs, s };
-      return s->to_number(key_) == nr().first;
+      return s->to_number(key_) == nr(level, key, conn).first;
     }
   };
   using relate_t = std::vector<rule>;
@@ -89,9 +91,7 @@ struct sheet_t {
     Op next;
     sheet_t* s;
 
-    std::pair<value_t, Op> operator()() {
-      token_t level, key, conn;
-      if (next(level, key, conn)) ; else assert(false);
+    std::pair<value_t, Op> operator()(token_t& level, token_t& key, token_t& conn) {
       assert(conn != ";");
       value_t key0 = s->to_number(key, conn);
       numeric_reduce_step ns { key0, conn, value_t() };
@@ -122,15 +122,20 @@ struct sheet_t {
     constraints.back().emplace_back( rule { key, when, bf, this });
   }
   void record(const token_t& key, value_t val)
-  { tab[key] = val; }
+  { std::cout << key << "---" << val << "\n"; tab[key] = val; }
+
   void record(const token_t& key, token_t val)
   { tab[key] = to_number(val); }
+
   void record_result(const token_t& key, token_t val)
   { result[key] = to_number(val); }
-  iparser_t record_expr(const token_t& key, iparser_t p) {
+
+  iparser_t record_expr(const token_t& k, iparser_t p, token_t& level,
+                          token_t& key, token_t& conn) {
     numeric_reducer<decltype(p)> nr { p, this };
-    tab[key] = nr().first;
-    return p;
+    auto res = nr(level, key, conn);
+    tab[k] = res.first;
+    return res.second;
   }
   value_t to_number(const token_t& key)
   { return is_number(key) ? atof(key.c_str()) : tab[key]; }
@@ -148,10 +153,11 @@ struct sec_interface { };
 template <typename T>
 iparser_t parse_section(const T& x, const token_t& l, iparser_t p, sheet_t& s) {
   token_t level, key, conn, tmp_key;
+  bool default_val = true;
   while (!p.is_match(l) && p(level, key, conn)) {
-    if (conn == ":") { tmp_key = key; continue; }
-    if (conn == ";") { s.record(key, value_t()); continue; }
-    p = s.record_expr(tmp_key, p); //nr(level, key, conn));
+    if (conn == ":") { tmp_key = key; default_val = false; continue; }
+    if (conn == ";" && default_val) { s.record(key, value_t()); continue; }
+    p = s.record_expr(tmp_key, p, level, key, conn); default_val = true;
   }
   return p;
 }
@@ -235,6 +241,6 @@ int main() {
   sheet_t s;
   assert(parse(f,l,s));
   std::cout << s.tab.size();
-
+  for (const auto& t : s.tab) std::cout << t.first << " " << t.second << "\n";
   return 0;
 }
