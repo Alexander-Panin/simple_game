@@ -92,7 +92,7 @@ struct sheet_t {
     sheet_t* s;
 
     std::pair<value_t, Op> operator()(token_t& level, token_t& key, token_t& conn) {
-      assert(conn != ";");
+      if (conn == ";") return std::make_pair(s->to_number(key), next);
       value_t key0 = s->to_number(key, conn);
       numeric_reduce_step ns { key0, conn, value_t() };
       while (ns(key0, conn)) {
