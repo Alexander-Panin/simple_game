@@ -26,8 +26,9 @@ struct buff_stream {
 
   bool operator()(token_t& level, token_t& key, token_t& conn) {
     if (buff.size()) ; else return false;
-    auto p = buff.back(); buff.pop_back();
+    auto p = buff.back();
     key = p.first; conn = p.second;
+    buff.pop_back();
     return true;
   }
 };
