@@ -1,9 +1,5 @@
 #include <iostream>
-//#include <iterator>
-//#include <algorithm>
 #include <map>
-//#include <functional>
-//#include <utility>
 #include <stdlib.h>
 #include <vector>
 #include <cassert>
@@ -13,12 +9,11 @@ using value_t = double;
 
 bool is_number(token_t key) { return key[0] > 47 && key[0] < 58;  } // 0..9
 
-template <typename Op>
 struct buff_stream {
-  Op next;
   std::vector<std::pair<token_t, token_t>> buff;
 
-  Op create() {
+  template <typename Op>
+  Op create(Op next) {
     buff.reserve(16);
     token_t level, key, conn;
     while (next(level, key, conn)) {
@@ -28,6 +23,7 @@ struct buff_stream {
     std::reverse(begin(buff), end(buff));
     return next;
   }
+
   bool operator()(token_t& level, token_t& key, token_t& conn) {
     if (buff.size()) ; else return false;
     auto p = buff.back(); buff.pop_back();
@@ -44,9 +40,7 @@ struct parser_t
   I f ; I l;
 
   bool operator()(token_t& level, token_t& key, token_t& conn) {
-    auto v = parse_step(level) && parse_step(key) && parse_step(conn);
-    if (v) std::cout << level << " " << key << " " << conn << "\n";
-    return v;
+    return parse_step(level) && parse_step(key) && parse_step(conn);
   }
 
   bool is_match(const token_t& x) {
@@ -63,90 +57,94 @@ struct parser_t
 using it = std::istream_iterator<token_t>;
 using iparser_t = parser_t<it>;
 
+struct numeric_reduce_step
+{
+  // require conn = '+' or '*'
+  value_t key_; token_t conn_; value_t acc_;
+
+  bool operator()(value_t key, const token_t& conn)  {
+    if (conn_ == "-") { key *= -1; conn_ = "+"; }
+    if (conn_ == "/") { key = 1/key; conn_ = "*"; }
+    if (conn_ == "+") acc_ += key_;
+    if (conn_ == "*") key *= key_;
+    if (conn == ";") { acc_ += key; return false; }
+    key_ = key; conn_ = conn; return true;
+  }
+};
+
+template <typename Op, typename T>
+// TODO add requires
+// plz provide owner to use
+struct numeric_reducer
+{
+  Op next;
+  T* table;
+
+  std::pair<value_t, Op> operator()(token_t& level, token_t& key, token_t& conn) {
+    if (conn == ";") return std::make_pair(to_number(*table, key), next);
+    value_t key0 = to_number(*table, key);
+    numeric_reduce_step ns { key0, conn, value_t() };
+    do {
+      if (next(level, key, conn)) ; else assert(false);
+      key0 = to_number(*table, key);
+    } while (ns(key0, conn));
+    return std::make_pair(ns.acc_, next);
+  }
+};
+
+template<typename T>
+// TODO add requires
+// plz provide owner to use
+struct rule {
+  token_t key_;
+  token_t when_;
+  buff_stream bs;
+  T* table;
+  bool operator()() {
+    if (lookup(*table, when_)) ; else return true;
+    token_t level, key, conn;
+    bs(level, key, conn);
+    numeric_reducer<decltype(bs), T> nr { bs, table };
+    value_t res = nr(level, key, conn).first;
+    value_t res0 = to_number(*table, key_);
+    return res0 == res;
+  }
+};
+
 struct sheet_t {
   using table_t = std::map<token_t, value_t>;
+  using relate_t = std::vector<rule<sheet_t>>;
+  using result_t = std::vector<std::pair<token_t, token_t>>;
+
   table_t tab { {"true", value_t(1)}, {"false", value_t(0)} };
-  table_t result;
-
-  // do not use outside sheet_t
-  struct rule {
-    token_t key_; token_t when_;
-    buff_stream<iparser_t> bs;
-    sheet_t* s;
-    bool operator()() {
-      if (s->lookup(when_)) ; else return true;
-      token_t level, key, conn;
-      bs(level, key, conn);
-      numeric_reducer<decltype(bs)> nr { bs, s };
-      return s->to_number(key_) == nr(level, key, conn).first;
-    }
-  };
-  using relate_t = std::vector<rule>;
   std::vector<relate_t> constraints;
+  result_t result;
 
-  // do not use outside sheet_t
-  template <typename Op>
-  struct numeric_reducer
-  {
-    Op next;
-    sheet_t* s;
-
-    std::pair<value_t, Op> operator()(token_t& level, token_t& key, token_t& conn) {
-      if (conn == ";") return std::make_pair(s->to_number(key), next);
-      value_t key0 = s->to_number(key, conn);
-      numeric_reduce_step ns { key0, conn, value_t() };
-      while (ns(key0, conn)) {
-        if (next(level, key, conn)) ; else assert(false);
-        key0 = s->to_number(key, conn);
-      }
-      return std::make_pair(ns.acc_, next);
-    }
-  };
-
-  struct numeric_reduce_step
-  {
-    // require conn = '+' or '*'
-    value_t key_; token_t conn_; value_t acc_;
-
-    bool operator()(value_t key, const token_t& conn)  {
-      if (conn_ == "+") acc_ += key_;
-      if (conn_ == "*") key *= key_;
-      if (conn == ";") { acc_ += key; return false; }
-      key_ = key; conn_ = conn; return true;
-    }
-  };
-
-  value_t lookup(token_t k) { return tab[k]; }
   void make_rules_set() { constraints.emplace_back(relate_t()); }
-  void add_rule(token_t key, token_t when, buff_stream<iparser_t> bf) {
-    constraints.back().emplace_back( rule { key, when, bf, this });
-  }
-  void record(const token_t& key, value_t val)
-  { std::cout << key << "---" << val << "\n"; tab[key] = val; }
-
-  void record(const token_t& key, token_t val)
-  { tab[key] = to_number(val); }
-
-  void record_result(const token_t& key, token_t val)
-  { result[key] = to_number(val); }
+  void add_rule(token_t key, token_t when, buff_stream bf)
+  { constraints.back().emplace_back( rule<sheet_t> { key, when, bf, this }); }
 
   iparser_t record_expr(const token_t& k, iparser_t p, token_t& level,
                           token_t& key, token_t& conn) {
-    numeric_reducer<decltype(p)> nr { p, this };
+    numeric_reducer<decltype(p), sheet_t> nr { p, this };
     auto res = nr(level, key, conn);
-    tab[k] = res.first;
+    record(*this, k, res.first);
     return res.second;
   }
-  value_t to_number(const token_t& key)
-  { return is_number(key) ? atof(key.c_str()) : tab[key]; }
+  friend value_t to_number(sheet_t& s, const token_t& key);
+  friend value_t lookup(sheet_t& s, token_t k) { return s.tab[k]; }
+  friend void record(sheet_t& s, const token_t& key, value_t val) { s.tab[key] = val;}
 
-  value_t to_number(const token_t& key, token_t& conn) {
-    value_t key0 = is_number(key) ? atof(key.c_str()) : tab[key];
-    if (conn == "-") { key0 *= -1; conn = "+"; }
-    if (conn == "/") { key0 = 1/key0; conn = "*"; }
-    return key0;
+  table_t result_map() {
+    auto f = begin(result); auto l = end(result);
+    table_t m;
+    while(f != l) { m[(*f).first] = tab[(*f).second]; f++; }
+    return m;
   }
 };
+
+value_t to_number(sheet_t& s, const token_t& key)
+{ return is_number(key) ? atof(key.c_str()) : s.tab[key]; }
 
 struct sec_input { };
 struct sec_interface { };
@@ -156,7 +154,7 @@ iparser_t parse_section(const T& x, const token_t& l, iparser_t p, sheet_t& s) {
   bool default_val = true;
   while (!p.is_match(l) && p(level, key, conn)) {
     if (conn == ":") { tmp_key = key; default_val = false; continue; }
-    if (conn == ";" && default_val) { s.record(key, value_t()); continue; }
+    if (conn == ";" && default_val) { record(s, key, value_t()); continue; }
     p = s.record_expr(tmp_key, p, level, key, conn); default_val = true;
   }
   return p;
@@ -186,14 +184,17 @@ struct parser_section_t {
   std::unique_ptr<concept_t> self_;
 };
 
+
 struct sec_output { };
 iparser_t parse_section(const sec_output& x, const token_t& l,
                           iparser_t p, sheet_t &s) {
   token_t level, key, conn, tmp_key;
+  std::vector<std::pair<token_t, token_t>> m;
   while (!p.is_match(l) && p(level, key, conn)) {
     if (conn == ":") tmp_key = key;
-    else if (conn == "," || conn == ";") s.record_result(tmp_key, key);
+    else if (conn == "," || conn == ";") m.emplace_back(std::make_pair(tmp_key, key));
   }
+  s.result = std::move(m);
   return p;
 }
 
@@ -202,15 +203,14 @@ iparser_t parse_section(const sec_logic&, const token_t& l, iparser_t p, sheet_t
   token_t level, key, conn, when;
   while (!p.is_match(l) && p(level, key, conn)) {
     bool is_when = false;
-    if (key == "relate") s.make_rules_set();
-    else if (key == "when") {
+    if (key == "when") {
       if (p(level, key, conn)) ; else assert(false); // require the same level
       when = key; is_when=true;
     }
+    else if (key == "relate") s.make_rules_set();
     else if (conn == "<==") {
-      if (p(level, key, conn)) ; else assert(false); // require the same level
-      buff_stream<decltype(p)> bs { p };
-      p = bs.create();
+      buff_stream bs;
+      p = bs.create( p );
       s.add_rule( key, is_when ? when : "true", bs );
     }
   }
@@ -225,11 +225,9 @@ bool parse(it first, it last, sheet_t& s) {
   funcs.emplace_back( parser_section_t { sec_logic() } );
   funcs.emplace_back( parser_section_t { sec_output() } );
   auto f = begin(funcs); auto l = end(funcs);
-  token_t level, key, conn, sec_level;
+  token_t level, key, conn;
   iparser_t p { first, last };
   while (p(level, key, conn)) {
-    //assert( sec_level == level );
-    sec_level = level;
     if (key == keys.back() && conn == ":") keys.pop_back(); else return false;
     p = parse_section(*f++, level, p, s);
   }
@@ -240,7 +238,6 @@ int main() {
   it l; it f(std::cin);
   sheet_t s;
   assert(parse(f,l,s));
-  std::cout << s.tab.size();
-  for (const auto& t : s.tab) std::cout << t.first << " " << t.second << "\n";
+
   return 0;
 }
