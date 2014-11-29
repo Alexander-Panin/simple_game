@@ -7,31 +7,7 @@
 using token_t = std::string;
 using value_t = double;
 
-bool is_number(token_t key) { return key[0] > 47 && key[0] < 58;  } // 0..9
-
-struct buff_stream {
-  std::vector<std::pair<token_t, token_t>> buff;
-
-  template <typename Op>
-  Op create(Op next) {
-    buff.reserve(16);
-    token_t level, key, conn;
-    while (next(level, key, conn)) {
-      buff.push_back(std::make_pair(key, conn));
-      if (conn == ";") break;
-    }
-    std::reverse(begin(buff), end(buff));
-    return next;
-  }
-
-  bool operator()(token_t& level, token_t& key, token_t& conn) {
-    if (buff.size()) ; else return false;
-    auto p = buff.back();
-    key = p.first; conn = p.second;
-    buff.pop_back();
-    return true;
-  }
-};
+bool is_number(const token_t& key) { return key[0] > 47 && key[0] < 58;  } // 0..9
 
 template <typename I>
 struct parser_t
@@ -57,6 +33,32 @@ struct parser_t
 
 using it = std::istream_iterator<token_t>;
 using iparser_t = parser_t<it>;
+
+// helper's functors -------------------------
+
+struct buff_stream {
+  std::vector<std::pair<token_t, token_t>> buff;
+
+  template <typename Op>
+  Op create(Op next) {
+    buff.reserve(16);
+    token_t level, key, conn;
+    while (next(level, key, conn)) {
+      buff.push_back(std::make_pair(key, conn));
+      if (conn == ";") break;
+    }
+    std::reverse(begin(buff), end(buff));
+    return next;
+  }
+
+  bool operator()(token_t& level, token_t& key, token_t& conn) {
+    if (buff.size()) ; else return false;
+    auto p = buff.back();
+    key = p.first; conn = p.second;
+    buff.pop_back();
+    return true;
+  }
+};
 
 struct numeric_reduce_step
 {
@@ -111,6 +113,8 @@ struct rule {
   }
 };
 
+// main state object after parsing
+
 struct sheet_t {
   using table_t = std::map<token_t, value_t>;
   using relate_t = std::vector<rule<sheet_t>>;
@@ -131,13 +135,13 @@ struct sheet_t {
     record(*this, k, res.first);
     return res.second;
   }
+
   friend value_t to_number(sheet_t& s, const token_t& key);
   friend value_t lookup(sheet_t& s, token_t k) { return s.tab[k]; }
   friend void record(sheet_t& s, const token_t& key, value_t val) { s.tab[key] = val;}
 
   table_t result_map() {
-    auto f = begin(result); auto l = end(result);
-    table_t m;
+    auto f = begin(result); auto l = end(result); table_t m;
     while(f != l) { m[(*f).first] = tab[(*f).second]; f++; }
     return m;
   }
@@ -145,6 +149,9 @@ struct sheet_t {
 
 value_t to_number(sheet_t& s, const token_t& key)
 { return is_number(key) ? atof(key.c_str()) : s.tab[key]; }
+
+
+// section's polymorphism
 
 struct sec_input { };
 struct sec_interface { };
@@ -184,7 +191,6 @@ struct parser_section_t {
   std::unique_ptr<concept_t> self_;
 };
 
-
 struct sec_output { };
 iparser_t parse_section(const sec_output& x, const token_t& l,
                           iparser_t p, sheet_t &s) {
@@ -217,6 +223,8 @@ iparser_t parse_section(const sec_logic&, const token_t& l, iparser_t p, sheet_t
   return p;
 }
 
+// main parse method
+
 bool parse(it first, it last, sheet_t& s) {
   std::vector<token_t> keys { "output", "logic", "interface", "input" };
   std::vector<parser_section_t> funcs;
@@ -229,7 +237,7 @@ bool parse(it first, it last, sheet_t& s) {
   iparser_t p { first, last };
   while (p(level, key, conn)) {
     // requires level always the same
-    assert(keys.size());
+    assert(keys.size()); assert(f != l);
     if (key == keys.back() && conn == ":") keys.pop_back(); else return false;
     p = parse_section(*f++, level, p, s);
   }
