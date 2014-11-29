@@ -60,7 +60,6 @@ using iparser_t = parser_t<it>;
 
 struct numeric_reduce_step
 {
-  // require conn = '+' or '*'
   value_t key_; token_t conn_; value_t acc_;
 
   bool operator()(value_t key, const token_t& conn)  {
@@ -229,6 +228,8 @@ bool parse(it first, it last, sheet_t& s) {
   token_t level, key, conn;
   iparser_t p { first, last };
   while (p(level, key, conn)) {
+    // requires level always the same
+    assert(keys.size());
     if (key == keys.back() && conn == ":") keys.pop_back(); else return false;
     p = parse_section(*f++, level, p, s);
   }
