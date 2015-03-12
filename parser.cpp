@@ -17,8 +17,8 @@ struct parser_t
 {
   I f ; I l;
 
-  friend bool parse_step(parser_t& t, token_t& level, token_t& key, token_t& conn)
-  { return t.step(level) && t.step(key) && t.step(conn); }
+  bool next(token_t& level, token_t& key, token_t& conn)
+  { return step(level) && step(key) && step(conn); }
 
   bool is_match(const token_t& x) {
     if (f != l && *f == x) return true;
@@ -156,7 +156,7 @@ template <typename Parser>
 Parser parse0(Parser p, const token_t& l, sheet_t& s) {
   token_t level, key, conn, tmp_key;
   bool default_val = true;
-  while (!p.is_match(l) && parse_step(p, level, key, conn)) {
+  while (!p.is_match(l) && p.next(level, key, conn)) {
     if (conn == ":") { tmp_key = key; default_val = false; continue; }
     if (conn == ";" && default_val) { record(s, key, value_t()); continue; }
     p = s.record_expr(tmp_key, p, level, key, conn); default_val = true;
@@ -169,7 +169,7 @@ template <typename Parser>
 Parser parse1(Parser p, const token_t& l, sheet_t &s) {
   token_t level, key, conn, tmp_key;
   std::vector<std::pair<token_t, token_t>> m;
-  while (!p.is_match(l) && parse_step(p, level, key, conn)) {
+  while (!p.is_match(l) && p.next(level, key, conn)) {
     if (conn == ":") tmp_key = key;
     else if (conn == "," || conn == ";") m.emplace_back(std::make_pair(tmp_key, key));
   }
@@ -181,10 +181,10 @@ template <typename Parser>
 // logic
 Parser parse2(Parser p, const token_t& l, sheet_t& s) {
   token_t level, key, conn, when;
-  while (!p.is_match(l) && parse_step(level, key, conn)) {
+  while (!p.is_match(l) && p.next(level, key, conn)) {
     bool is_when = false;
     if (key == "when") {
-      if (parse_step(p, level, key, conn)) ; else assert(false);
+      if (p.next(level, key, conn)) ; else assert(false);
       when = key; is_when=true;
     }
     else if (key == "relate") s.make_rules_set();
@@ -203,7 +203,7 @@ template<typename I>
 bool parse(I first, I last, sheet_t& s) {
   token_t level, key, conn;
   parser_t<I> p { first, last };
-  while (parse_step(p, level, key, conn)) {
+  while (p.next(level, key, conn)) {
     if (key == "input" or key == "interface") parse0(p, level, s);
     else if (key == "logic") parse2(p, level, s);
     else if (key == "output") parse1(p, level, s);
